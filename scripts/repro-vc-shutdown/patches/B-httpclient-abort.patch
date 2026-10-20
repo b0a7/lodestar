@@ -1,0 +1,48 @@
+diff --git a/packages/api/src/utils/client/httpClient.ts b/packages/api/src/utils/client/httpClient.ts
+index df0f48d44..ff7d45fd1 100644
+--- a/packages/api/src/utils/client/httpClient.ts
++++ b/packages/api/src/utils/client/httpClient.ts
+@@ -356,9 +356,13 @@ export class HttpClient implements IHttpClient {
+     init.signal = controller.signal;
+ 
+     // Attach global/local signal to this request's controller
++    // Check already-aborted after subscribe to avoid a race where abort fires between the check and addEventListener
+     const onSignalAbort = (): void => controller.abort();
+     for (const s of abortSignals) {
+       s?.addEventListener("abort", onSignalAbort);
++      if (s?.aborted) {
++        controller.abort();
++      }
+     }
+ 
+     const routeId = definition.operationId;
+diff --git a/packages/api/test/unit/client/httpClient.test.ts b/packages/api/test/unit/client/httpClient.test.ts
+index 1553c95d4..7215ab295 100644
+--- a/packages/api/test/unit/client/httpClient.test.ts
++++ b/packages/api/test/unit/client/httpClient.test.ts
+@@ -427,4 +427,25 @@ describe("httpClient json client", () => {
+       if (!(e instanceof ErrorAborted)) throw Error(`Not an ErrorAborted: ${(e as Error).message}`);
+     }
+   });
++
++  it("should abort immediately when the signal is already aborted", async () => {
++    const {baseUrl} = await getServer({
++      ...testRoute,
++      handler: async () => new Promise((r) => setTimeout(r, 1000)),
++    });
++
++    const controller = new AbortController();
++    controller.abort();
++    const httpClient = new HttpClient({
++      baseUrl,
++      globalInit: {signal: controller.signal, timeoutMs: 5000},
++    });
++
++    try {
++      await httpClient.request(testDefinition, {});
++      return Promise.reject(Error("did not throw"));
++    } catch (e) {
++      if (!(e instanceof ErrorAborted)) throw Error(`Not an ErrorAborted: ${(e as Error).message}`);
++    }
++  });
+ });
