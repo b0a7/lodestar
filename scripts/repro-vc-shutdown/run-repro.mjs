@@ -12,7 +12,7 @@
  *   2 = VC exceeded bound / still alive (FAIL for unpatched hang)
  *   1 = setup/orchestration error
  */
-import {spawn} from "node:child_process";
+import {execFileSync, spawn} from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -63,6 +63,14 @@ const resultPath = path.join(outDir, "result.json");
 
 fs.mkdirSync(outDir, {recursive: true});
 fs.mkdirSync(dataDir, {recursive: true});
+// Fresh logs every run (reuse of outDir must not see prior ready markers)
+for (const f of [vcLogPath, stubLogPath, dumpPath, resultPath, path.join(outDir, "proc-fd.txt")]) {
+  try {
+    fs.rmSync(f, {force: true});
+  } catch {
+    /* ignore */
+  }
+}
 
 const nodeBin = process.execPath;
 const dumpPreload = path.join(__dirname, "dump-handles.mjs");
@@ -305,9 +313,13 @@ async function main() {
     withinBound,
     verdict,
     vcPid: vcProc.pid,
-    gitHead: fs.existsSync(path.join(repoRoot, ".git"))
-      ? fs.readFileSync(path.join(repoRoot, ".git/HEAD"), "utf8").trim()
-      : null,
+    gitHead: (() => {
+      try {
+        return execFileSync("git", ["rev-parse", "HEAD"], {cwd: repoRoot, encoding: "utf8"}).trim();
+      } catch {
+        return null;
+      }
+    })(),
     outDir,
     dumpPath: fs.existsSync(dumpPath) ? dumpPath : null,
     procFdSample,
