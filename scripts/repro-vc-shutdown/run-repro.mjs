@@ -52,8 +52,7 @@ const hangWaitMs = Number(args.hangWaitMs || boundMs + 5000);
 const port = Number(args.port);
 const label = args.label;
 const outDir =
-  args.outDir ||
-  path.join("/opt/cursor/artifacts/lodestar-vc-shutdown/logs", label.replace(/[^\w.-]+/g, "_"));
+  args.outDir || path.join(repoRoot, "repro-logs", label.replace(/[^\w.-]+/g, "_"));
 const dataDir = args.dataDir || fs.mkdtempSync(path.join(os.tmpdir(), "lodestar-vc-shutdown-"));
 const lodestarBin = path.resolve(repoRoot, args.lodestarBin);
 const dumpPath = path.join(outDir, "handles.txt");

@@ -24,12 +24,13 @@ const {values: args} = parseArgs({
     },
     outRoot: {
       type: "string",
-      default: "/opt/cursor/artifacts/lodestar-vc-shutdown/logs",
+      default: "",
     },
   },
 });
 
 const variants = args.variants.split(",").map((s) => s.trim()).filter(Boolean);
+const outRoot = args.outRoot || path.join(repoRoot, "repro-logs");
 const allRows = [];
 
 function sh(cmd, cmdArgs, opts = {}) {
@@ -66,7 +67,7 @@ for (const variant of variants) {
   ]);
   buildFor(letters);
 
-  const summaryPath = path.join(args.outRoot, `${label}-summary.json`);
+  const summaryPath = path.join(outRoot, `${label}-summary.json`);
   const r = spawnSync(
     process.execPath,
     [
@@ -82,7 +83,7 @@ for (const variant of variants) {
       "--hangWaitMs",
       args.hangWaitMs,
       "--outRoot",
-      args.outRoot,
+      outRoot,
     ],
     {cwd: repoRoot, stdio: "inherit"}
   );
@@ -97,10 +98,8 @@ for (const variant of variants) {
 // restore clean tree for PR-touched files
 sh(process.execPath, [path.join(__dirname, "apply-variant.mjs"), "none"]);
 
-const aggregatePath = path.join(
-  "/opt/cursor/artifacts/lodestar-vc-shutdown",
-  "variant-aggregate.json"
-);
+fs.mkdirSync(outRoot, {recursive: true});
+const aggregatePath = path.join(outRoot, "variant-aggregate.json");
 fs.writeFileSync(aggregatePath, JSON.stringify(allRows, null, 2));
 
 // compact table
@@ -122,10 +121,9 @@ for (const [key, times] of byKey) {
     .every((r) => r.withinBound);
   table.push({label, signal, runs: nums.length, minMs: min, avgMs: avg && Math.round(avg), maxMs: max, allWithinBound: pass});
 }
-fs.writeFileSync(
-  path.join("/opt/cursor/artifacts/lodestar-vc-shutdown", "variant-table.json"),
-  JSON.stringify(table, null, 2)
-);
+const tablePath = path.join(outRoot, "variant-table.json");
+fs.writeFileSync(tablePath, JSON.stringify(table, null, 2));
 console.log("\n=== AGGREGATE ===");
 console.table(table);
 console.log(`wrote ${aggregatePath}`);
+console.log(`wrote ${tablePath}`);

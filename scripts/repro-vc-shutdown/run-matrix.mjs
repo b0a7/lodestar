@@ -28,18 +28,19 @@ const {values: args} = parseArgs({
     signals: {type: "string", default: "SIGINT,SIGTERM"},
     outRoot: {
       type: "string",
-      default: "/opt/cursor/artifacts/lodestar-vc-shutdown/logs",
+      default: "",
     },
   },
 });
 
 const runs = Number(args.runs);
 const signals = args.signals.split(",").map((s) => s.trim()).filter(Boolean);
+const outRoot = args.outRoot || path.join(repoRoot, "repro-logs");
 const summary = [];
 
 function runOnce(label, signal, runIdx) {
   return new Promise((resolve) => {
-    const outDir = path.join(args.outRoot, `${label}-${signal}-r${runIdx}`);
+    const outDir = path.join(outRoot, `${label}-${signal}-r${runIdx}`);
     const port = 19596 + (runIdx % 20) + (signal === "SIGTERM" ? 40 : 0);
     const child = spawn(
       process.execPath,
@@ -100,7 +101,7 @@ async function main() {
     }
   }
 
-  const summaryPath = path.join(args.outRoot, `${args.label}-summary.json`);
+  const summaryPath = path.join(outRoot, `${args.label}-summary.json`);
   fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
   console.log(`\nSummary written ${summaryPath}`);
   console.table(summary.map(({label, signal, run, exitMs, verdict, withinBound}) => ({label, signal, run, exitMs, verdict, withinBound})));
